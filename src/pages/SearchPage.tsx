@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +39,7 @@ const SearchPage = () => {
   const { addToPipeline, removeFromPipeline, isInPipeline } = usePipeline();
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!user) return;
@@ -128,7 +130,7 @@ const SearchPage = () => {
           {filtered.map((g) => {
             const saved = isInPipeline(g.id);
             return (
-              <Card key={g.id} className="transition-shadow hover:shadow-md">
+              <Card key={g.id} className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => navigate(`/app/grants/${g.id}`)}>
                 <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -158,14 +160,14 @@ const SearchPage = () => {
                     <Button
                       variant={saved ? "default" : "ghost"}
                       size="icon"
-                      onClick={() => handleToggleSave(g)}
+                      onClick={(e) => { e.stopPropagation(); handleToggleSave(g); }}
                       title={saved ? "Remove from pipeline" : "Save to pipeline"}
                     >
                       {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
                     </Button>
                     {(g.application_url || g.source_url) && (
                       <Button variant="ghost" size="icon" asChild>
-                        <a href={g.application_url || g.source_url || "#"} target="_blank" rel="noopener noreferrer">
+                        <a href={g.application_url || g.source_url || "#"} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
                           <ExternalLink className="h-4 w-4" />
                         </a>
                       </Button>
