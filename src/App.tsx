@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { PipelineProvider } from "@/contexts/PipelineContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -23,27 +24,29 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/app" element={<AppLayout />}>
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="search" element={<SearchPage />} />
-            <Route path="pipeline" element={<Pipeline />} />
-            <Route path="calendar" element={<CalendarPage />} />
-            <Route path="sources" element={<Sources />} />
-            <Route path="profile" element={<OrgProfile />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="grants/:id" element={<GrantDetail />} />
-            <Route path="admin/runs" element={<AgentRuns />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <PipelineProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/app" element={<AppLayout />}>
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="search" element={<SearchPage />} />
+              <Route path="pipeline" element={<Pipeline />} />
+              <Route path="calendar" element={<CalendarPage />} />
+              <Route path="sources" element={<Sources />} />
+              <Route path="profile" element={<OrgProfile />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="grants/:id" element={<GrantDetail />} />
+              <Route path="admin/runs" element={<AgentRuns />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </PipelineProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
