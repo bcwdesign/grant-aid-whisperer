@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { X, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const orgTypes = ["501(c)(3)", "School Foundation", "Faith-Based", "Community Organization", "Government", "Other"];
 const budgetRanges = ["Under $100K", "$100K - $500K", "$500K - $1M", "$1M - $5M", "$5M+"];
@@ -15,15 +17,42 @@ const focusOptions = ["Education", "Health", "Environment", "Arts", "Housing", "
 
 const OrgProfile = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [saving, setSaving] = useState(false);
-  const [name, setName] = useState("Acme Nonprofit");
-  const [orgType, setOrgType] = useState("501(c)(3)");
-  const [budget, setBudget] = useState("$500K - $1M");
+  const [loading, setLoading] = useState(true);
+  const [orgId, setOrgId] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [orgType, setOrgType] = useState("");
+  const [budget, setBudget] = useState("");
   const [mission, setMission] = useState("");
-  const [country, setCountry] = useState("United States");
-  const [state, setState] = useState("California");
-  const [city, setCity] = useState("San Francisco");
-  const [selectedFocus, setSelectedFocus] = useState<string[]>(["Education", "Youth"]);
+  const [country, setCountry] = useState("");
+  const [state, setState] = useState("");
+  const [city, setCity] = useState("");
+  const [selectedFocus, setSelectedFocus] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { data, error } = await supabase
+        .from("organizations")
+        .select("*")
+        .eq("owner_user_id", user.id)
+        .maybeSingle();
+      if (data) {
+        setOrgId(data.id);
+        setName(data.name || "");
+        setOrgType(data.org_type || "");
+        setBudget(data.annual_budget_range || "");
+        setMission(data.mission || "");
+        setCountry(data.location_country || "");
+        setState(data.location_state || "");
+        setCity(data.location_city || "");
+        setSelectedFocus(data.focus_areas || []);
+      }
+      setLoading(false);
+    };
+    load();
+  }, [user]);
 
   const toggleFocus = (area: string) => {
     setSelectedFocus((prev) =>
@@ -36,12 +65,36 @@ const OrgProfile = () => {
       toast({ title: "Organization name is required", variant: "destructive" });
       return;
     }
+    if (!orgId) return;
     setSaving(true);
-    // Simulate save — will persist to DB once auth is added
-    await new Promise((r) => setTimeout(r, 500));
+    const { error } = await supabase
+      .from("organizations")
+      .update({
+        name: name.trim(),
+        org_type: orgType || null,
+        annual_budget_range: budget || null,
+        mission: mission || null,
+        location_country: country || null,
+        location_state: state || null,
+        location_city: city || null,
+        focus_areas: selectedFocus,
+      })
+      .eq("id", orgId);
     setSaving(false);
-    toast({ title: "Profile saved", description: "Your organization profile has been updated." });
+    if (error) {
+      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Profile saved", description: "Your organization profile has been updated." });
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-brand" />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -64,7 +117,7 @@ const OrgProfile = () => {
             <div className="space-y-2">
               <Label>Organization Type</Label>
               <Select value={orgType} onValueChange={setOrgType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent>
                   {orgTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
@@ -73,7 +126,7 @@ const OrgProfile = () => {
             <div className="space-y-2">
               <Label>Annual Budget</Label>
               <Select value={budget} onValueChange={setBudget}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select range" /></SelectTrigger>
                 <SelectContent>
                   {budgetRanges.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
                 </SelectContent>
