@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { usePipeline } from "@/contexts/PipelineContext";
 
 const columns = [
   { key: "not_started", label: "Not Started", color: "bg-muted" },
@@ -10,16 +11,9 @@ const columns = [
   { key: "submitted", label: "Submitted", color: "bg-primary/10" },
 ];
 
-const grants = [
-  { id: 1, title: "Community Development Block Grant", funder: "HUD", amount: "$500K", status: "in_progress", deadline: "Mar 15" },
-  { id: 2, title: "Youth Education Initiative", funder: "Google.org", amount: "$250K", status: "researching", deadline: "Mar 22" },
-  { id: 3, title: "Environmental Justice Small Grants", funder: "EPA", amount: "$100K", status: "not_started", deadline: "Apr 1" },
-  { id: 4, title: "Arts in Education Grant", funder: "NEA", amount: "$75K", status: "in_progress", deadline: "Apr 10" },
-  { id: 5, title: "Rural Health Outreach", funder: "HRSA", amount: "$300K", status: "submitted", deadline: "Feb 28" },
-  { id: 6, title: "Digital Equity Grant", funder: "NTIA", amount: "$150K", status: "not_started", deadline: "May 1" },
-];
-
 const Pipeline = () => {
+  const { pipelineGrants } = usePipeline();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -32,10 +26,9 @@ const Pipeline = () => {
         </Button>
       </div>
 
-      {/* Kanban */}
       <div className="grid gap-4 lg:grid-cols-4">
         {columns.map((col) => {
-          const colGrants = grants.filter((g) => g.status === col.key);
+          const colGrants = pipelineGrants.filter((g) => g.status === col.key);
           return (
             <div key={col.key} className="space-y-3">
               <div className="flex items-center gap-2">
