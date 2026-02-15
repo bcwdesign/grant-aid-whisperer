@@ -81,16 +81,12 @@ async function callTinyFish(url: string, apiKey: string): Promise<any> {
       currentData = line.slice(6);
       try {
         const parsed = JSON.parse(currentData);
-        // Look for result/completed events
-        if (parsed.type === "RESULT" || parsed.type === "COMPLETED" || parsed.result) {
-          result = parsed.result || parsed.data || parsed;
-        }
-        // Also capture any data that has grants
-        if (parsed.grants || (parsed.data && parsed.data.grants)) {
-          result = parsed;
-        }
-        // Keep updating - last valid data wins
-        if (parsed.type !== "STARTED" && parsed.type !== "STREAMING_URL" && parsed.type !== "PROGRESS") {
+        // Look for the COMPLETE event with resultJson
+        if (parsed.type === "COMPLETE" && parsed.resultJson) {
+          result = parsed.resultJson;
+        } else if (parsed.type === "RESULT" || parsed.type === "COMPLETED") {
+          result = parsed.resultJson || parsed.result || parsed.data || parsed;
+        } else if (parsed.grants || (parsed.data && parsed.data.grants)) {
           result = parsed;
         }
       } catch {
