@@ -28,6 +28,7 @@ const Dashboard = () => {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [grantsCount, setGrantsCount] = useState(0);
   const [deadlinesCount, setDeadlinesCount] = useState(0);
+  const [totalFunding, setTotalFunding] = useState(0);
   const [lastRun, setLastRun] = useState<{ status: string; grants_found: number; errors: string[] } | null>(null);
 
   useEffect(() => {
@@ -60,6 +61,23 @@ const Dashboard = () => {
           .lte("deadline_date", in14);
         setDeadlinesCount(dlCount || 0);
 
+        // Get total potential funding from grants
+        const { data: fundingData } = await supabase
+          .from("grants")
+          .select("funding_amount_json")
+          .eq("organization_id", org.id);
+        if (fundingData) {
+          let total = 0;
+          for (const g of fundingData) {
+            const f = g.funding_amount_json as any;
+            if (!f) continue;
+            if (f.amount) total += Number(f.amount) || 0;
+            else if (f.max_amount) total += Number(f.max_amount) || 0;
+            else if (f.min_amount) total += Number(f.min_amount) || 0;
+          }
+          setTotalFunding(total);
+        }
+
         // Get last agent run
         const { data: run } = await supabase
           .from("agent_runs")
@@ -86,7 +104,7 @@ const Dashboard = () => {
     { label: "Grants Discovered", value: String(grantsCount), change: grantsCount > 0 ? "In database" : "Run search to discover", icon: Search },
     { label: "In Pipeline", value: String(pipelineCount), change: pipelineCount > 0 ? "Grants tracked" : "Save grants to track", icon: Layers },
     { label: "Upcoming Deadlines", value: String(deadlinesCount), change: "Next 14 days", icon: Clock },
-    { label: "Potential Funding", value: "$0", change: "Total pipeline value", icon: DollarSign },
+    { label: "Potential Funding", value: totalFunding > 0 ? `$${totalFunding.toLocaleString()}` : "$0", change: "From discovered grants", icon: DollarSign },
   ];
 
   const handleRunSearch = async () => {
