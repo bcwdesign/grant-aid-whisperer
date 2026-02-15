@@ -113,10 +113,21 @@ const Dashboard = () => {
       return;
     }
     setIsRunning(true);
-    toast({ title: "Starting grant search...", description: `Scanning ${DEFAULT_URLS.length} sources. This may take a few minutes.` });
+
+    // Fetch active sources from the database, fall back to defaults
+    const { data: activeSources } = await supabase
+      .from("grant_sources")
+      .select("url")
+      .eq("organization_id", orgId)
+      .eq("is_active", true);
+    const urls = activeSources && activeSources.length > 0
+      ? activeSources.map((s) => s.url)
+      : DEFAULT_URLS;
+
+    toast({ title: "Starting grant search...", description: `Scanning ${urls.length} sources. This may take a few minutes.` });
 
     try {
-      const result = await tinyfishApi.runSearch(orgId, DEFAULT_URLS);
+      const result = await tinyfishApi.runSearch(orgId, urls);
 
       if (result.success) {
         setGrantsCount((prev) => prev + (result.grants_found || 0));
