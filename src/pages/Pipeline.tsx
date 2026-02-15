@@ -1,8 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Plus, MoreVertical, ArrowRight, Trash2 } from "lucide-react";
 import { usePipeline } from "@/contexts/PipelineContext";
+import { useToast } from "@/hooks/use-toast";
 
 const columns = [
   { key: "not_started", label: "Not Started", color: "bg-muted" },
@@ -12,7 +14,19 @@ const columns = [
 ];
 
 const Pipeline = () => {
-  const { pipelineGrants } = usePipeline();
+  const { pipelineGrants, updateStatus, removeFromPipeline } = usePipeline();
+  const { toast } = useToast();
+
+  const handleMove = (id: string, title: string, newStatus: string) => {
+    updateStatus(id, newStatus);
+    const label = columns.find((c) => c.key === newStatus)?.label ?? newStatus;
+    toast({ title: `Moved to ${label}`, description: title });
+  };
+
+  const handleDelete = (id: string, title: string) => {
+    removeFromPipeline(id);
+    toast({ title: "Removed from pipeline", description: title });
+  };
 
   return (
     <div className="space-y-6">
@@ -27,7 +41,7 @@ const Pipeline = () => {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-4">
-        {columns.map((col) => {
+        {columns.map((col, colIdx) => {
           const colGrants = pipelineGrants.filter((g) => g.status === col.key);
           return (
             <div key={col.key} className="space-y-3">
@@ -40,9 +54,33 @@ const Pipeline = () => {
               </div>
               <div className="space-y-3">
                 {colGrants.map((g) => (
-                  <Card key={g.id} className="cursor-pointer transition-shadow hover:shadow-md">
+                  <Card key={g.id} className="transition-shadow hover:shadow-md">
                     <CardContent className="p-4">
-                      <p className="font-medium text-foreground">{g.title}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-medium text-foreground">{g.title}</p>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {columns
+                              .filter((c) => c.key !== col.key)
+                              .map((c) => (
+                                <DropdownMenuItem key={c.key} onClick={() => handleMove(g.id, g.title, c.key)}>
+                                  <ArrowRight className="mr-2 h-4 w-4" />
+                                  Move to {c.label}
+                                </DropdownMenuItem>
+                              ))}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(g.id, g.title)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Remove
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                       <p className="mt-1 text-xs text-muted-foreground">{g.funder}</p>
                       <div className="mt-3 flex items-center justify-between">
                         <span className="text-sm font-semibold text-brand">{g.amount}</span>
