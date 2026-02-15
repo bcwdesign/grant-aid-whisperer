@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Search, Layers, Clock, DollarSign, Zap, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { tinyfishApi } from "@/lib/api/tinyfish";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { usePipeline } from "@/contexts/PipelineContext";
 
 const DEFAULT_URLS = [
   "https://www.grants.gov/",
@@ -18,41 +20,93 @@ const DEFAULT_URLS = [
   "https://unitedwayatlanta.org/apply-for-a-grant/",
 ];
 
-// Demo org ID — in production this comes from auth context
-const DEMO_ORG_ID = "00000000-0000-0000-0000-000000000000";
-
-const getStats = (result: any) => [
-  { label: "Grants Discovered", value: result?.grants_found != null ? String(result.grants_found) : "—", change: result ? `From last search` : "Run search to discover", icon: Search },
-  { label: "In Pipeline", value: "0", change: "Save grants to track", icon: Layers },
-  { label: "Upcoming Deadlines", value: result?.grants ? String(result.grants.filter((g: any) => g.deadline_date).length) : "0", change: "With deadlines", icon: Clock },
-  { label: "Potential Funding", value: "$0", change: "Total pipeline value", icon: DollarSign },
-];
-
-const statusColors: Record<string, string> = {
-  not_started: "bg-muted text-muted-foreground",
-  researching: "bg-brand/10 text-brand",
-  in_progress: "bg-brand/20 text-brand",
-  submitted: "bg-primary/10 text-primary",
-};
-
 const Dashboard = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { pipelineGrants } = usePipeline();
   const [isRunning, setIsRunning] = useState(false);
-  const [lastResult, setLastResult] = useState<{
-    status: string;
-    grants_found: number;
-    errors: string[];
-  } | null>(null);
+  const [orgId, setOrgId] = useState<string | null>(null);
+  const [grantsCount, setGrantsCount] = useState(0);
+  const [deadlinesCount, setDeadlinesCount] = useState(0);
+  const [lastRun, setLastRun] = useState<{ status: string; grants_found: number; errors: string[] } | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      // Get user's org
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("owner_user_id", user.id)
+        .maybeSingle();
+      if (org) {
+        setOrgId(org.id);
+
+        // Get grants count
+        const { count } = await supabase
+          .from("grants")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", org.id);
+        setGrantsCount(count || 0);
+
+        // Get upcoming deadlines (next 14 days)
+        const now = new Date().toISOString().split("T")[0];
+        const in14 = new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0];
+        const { count: dlCount } = await supabase
+          .from("grants")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", org.id)
+          .gte("deadline_date", now)
+          .lte("deadline_date", in14);
+        setDeadlinesCount(dlCount || 0);
+
+        // Get last agent run
+        const { data: run } = await supabase
+          .from("agent_runs")
+          .select("*")
+          .eq("organization_id", org.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (run) {
+          setLastRun({
+            status: run.status,
+            grants_found: run.grants_found || 0,
+            errors: Array.isArray(run.errors_json) ? (run.errors_json as string[]) : [],
+          });
+        }
+      }
+    };
+    load();
+  }, [user]);
+
+  const pipelineCount = pipelineGrants.length;
+
+  const stats = [
+    { label: "Grants Discovered", value: String(grantsCount), change: grantsCount > 0 ? "In database" : "Run search to discover", icon: Search },
+    { label: "In Pipeline", value: String(pipelineCount), change: pipelineCount > 0 ? "Grants tracked" : "Save grants to track", icon: Layers },
+    { label: "Upcoming Deadlines", value: String(deadlinesCount), change: "Next 14 days", icon: Clock },
+    { label: "Potential Funding", value: "$0", change: "Total pipeline value", icon: DollarSign },
+  ];
 
   const handleRunSearch = async () => {
+    if (!orgId) {
+      toast({ title: "No organization found", description: "Please set up your org profile first.", variant: "destructive" });
+      return;
+    }
     setIsRunning(true);
     toast({ title: "Starting grant search...", description: `Scanning ${DEFAULT_URLS.length} sources. This may take a few minutes.` });
 
     try {
-      const result = await tinyfishApi.runSearch(DEMO_ORG_ID, DEFAULT_URLS);
-      setLastResult(result);
+      const result = await tinyfishApi.runSearch(orgId, DEFAULT_URLS);
 
       if (result.success) {
+        setGrantsCount((prev) => prev + (result.grants_found || 0));
+        setLastRun({
+          status: result.status,
+          grants_found: result.grants_found,
+          errors: result.errors || [],
+        });
         toast({
           title: `Search complete: ${result.grants_found} grants found`,
           description: result.errors?.length > 0
@@ -78,7 +132,7 @@ const Dashboard = () => {
 
       {/* KPIs */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {getStats(lastResult).map((s) => (
+        {stats.map((s) => (
           <Card key={s.label}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -98,11 +152,11 @@ const Dashboard = () => {
           <div>
             <h3 className="font-semibold text-foreground">Grant Search</h3>
             <p className="text-sm text-muted-foreground">
-              {lastResult ? (
+              {lastRun ? (
                 <span className="inline-flex items-center gap-1">
                   <CheckCircle2 className="h-3.5 w-3.5 text-brand" />
-                  Last run: {lastResult.status} · {lastResult.grants_found} grants found
-                  {lastResult.errors?.length > 0 && ` · ${lastResult.errors.length} errors`}
+                  Last run: {lastRun.status} · {lastRun.grants_found} grants found
+                  {lastRun.errors?.length > 0 && ` · ${lastRun.errors.length} errors`}
                 </span>
               ) : (
                 <span>{DEFAULT_URLS.length} sources configured · Ready to search</span>
@@ -124,7 +178,7 @@ const Dashboard = () => {
       </Card>
 
       {/* Last run errors */}
-      {lastResult?.errors && lastResult.errors.length > 0 && (
+      {lastRun?.errors && lastRun.errors.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -133,7 +187,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-sm">
-              {lastResult.errors.slice(0, 10).map((e, i) => (
+              {lastRun.errors.slice(0, 10).map((e, i) => (
                 <p key={i} className="text-muted-foreground">{e}</p>
               ))}
             </div>
