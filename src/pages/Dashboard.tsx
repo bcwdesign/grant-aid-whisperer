@@ -21,10 +21,10 @@ const DEFAULT_URLS = [
 // Demo org ID — in production this comes from auth context
 const DEMO_ORG_ID = "00000000-0000-0000-0000-000000000000";
 
-const stats = [
-  { label: "Grants Discovered", value: "—", change: "Run search to discover", icon: Search },
+const getStats = (result: any) => [
+  { label: "Grants Discovered", value: result?.grants_found != null ? String(result.grants_found) : "—", change: result ? `From last search` : "Run search to discover", icon: Search },
   { label: "In Pipeline", value: "0", change: "Save grants to track", icon: Layers },
-  { label: "Upcoming Deadlines", value: "0", change: "Next 14 days", icon: Clock },
+  { label: "Upcoming Deadlines", value: result?.grants ? String(result.grants.filter((g: any) => g.deadline_date).length) : "0", change: "With deadlines", icon: Clock },
   { label: "Potential Funding", value: "$0", change: "Total pipeline value", icon: DollarSign },
 ];
 
@@ -78,7 +78,7 @@ const Dashboard = () => {
 
       {/* KPIs */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((s) => (
+        {getStats(lastResult).map((s) => (
           <Card key={s.label}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">

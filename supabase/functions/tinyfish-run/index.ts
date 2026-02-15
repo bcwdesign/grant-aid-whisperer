@@ -311,9 +311,8 @@ Deno.serve(async (req) => {
             if (upsertError) {
               console.error(`Upsert error for "${grantRow.grant_title}":`, upsertError);
               allErrors.push(`Upsert failed for "${grantRow.grant_title}": ${upsertError.message}`);
-            } else {
-              totalGrantsFound++;
             }
+            totalGrantsFound++;
           } else {
             totalGrantsFound++;
           }
