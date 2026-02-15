@@ -1,1 +1,4 @@
 project_id = "fwdxnwtvyywrnontdeyp"
+
+[functions.tinyfish-run]
+verify_jwt = false

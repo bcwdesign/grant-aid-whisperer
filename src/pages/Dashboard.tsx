@@ -1,20 +1,31 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Layers, Clock, DollarSign, Zap, CheckCircle2, AlertCircle } from "lucide-react";
+import { Search, Layers, Clock, DollarSign, Zap, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { tinyfishApi } from "@/lib/api/tinyfish";
+import { useToast } from "@/hooks/use-toast";
 
-const stats = [
-  { label: "Grants Discovered", value: "47", change: "+12 this week", icon: Search },
-  { label: "In Pipeline", value: "8", change: "3 in progress", icon: Layers },
-  { label: "Upcoming Deadlines", value: "5", change: "Next 14 days", icon: Clock },
-  { label: "Potential Funding", value: "$2.4M", change: "Total pipeline value", icon: DollarSign },
+const DEFAULT_URLS = [
+  "https://www.grants.gov/",
+  "https://www.microsoft.com/en-us/corporate-responsibility/philanthropies",
+  "https://www.atlantafoundation.org/",
+  "https://cfgreateratlanta.org/grant-opportunities/",
+  "https://www.nsf.gov/funding/",
+  "https://www.ed.gov/grants-and-programs/apply-grant/available-grants",
+  "https://www.dol.gov/agencies/eta/grants/apply/find-opportunities",
+  "https://digitalready.verizonwireless.com/funding",
+  "https://unitedwayatlanta.org/apply-for-a-grant/",
 ];
 
-const deadlines = [
-  { title: "Community Development Block Grant", funder: "HUD", date: "Mar 15, 2026", status: "in_progress" },
-  { title: "Youth Education Initiative", funder: "Google.org", date: "Mar 22, 2026", status: "researching" },
-  { title: "Environmental Justice Small Grants", funder: "EPA", date: "Apr 1, 2026", status: "not_started" },
-  { title: "Arts in Education Grant", funder: "NEA", date: "Apr 10, 2026", status: "in_progress" },
+// Demo org ID — in production this comes from auth context
+const DEMO_ORG_ID = "00000000-0000-0000-0000-000000000000";
+
+const stats = [
+  { label: "Grants Discovered", value: "—", change: "Run search to discover", icon: Search },
+  { label: "In Pipeline", value: "0", change: "Save grants to track", icon: Layers },
+  { label: "Upcoming Deadlines", value: "0", change: "Next 14 days", icon: Clock },
+  { label: "Potential Funding", value: "$0", change: "Total pipeline value", icon: DollarSign },
 ];
 
 const statusColors: Record<string, string> = {
@@ -25,6 +36,39 @@ const statusColors: Record<string, string> = {
 };
 
 const Dashboard = () => {
+  const { toast } = useToast();
+  const [isRunning, setIsRunning] = useState(false);
+  const [lastResult, setLastResult] = useState<{
+    status: string;
+    grants_found: number;
+    errors: string[];
+  } | null>(null);
+
+  const handleRunSearch = async () => {
+    setIsRunning(true);
+    toast({ title: "Starting grant search...", description: `Scanning ${DEFAULT_URLS.length} sources. This may take a few minutes.` });
+
+    try {
+      const result = await tinyfishApi.runSearch(DEMO_ORG_ID, DEFAULT_URLS);
+      setLastResult(result);
+
+      if (result.success) {
+        toast({
+          title: `Search complete: ${result.grants_found} grants found`,
+          description: result.errors?.length > 0
+            ? `${result.errors.length} source(s) had issues`
+            : "All sources processed successfully",
+        });
+      } else {
+        toast({ title: "Search failed", description: result.error, variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -54,46 +98,48 @@ const Dashboard = () => {
           <div>
             <h3 className="font-semibold text-foreground">Grant Search</h3>
             <p className="text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <CheckCircle2 className="h-3.5 w-3.5 text-brand" /> Last run: 2 hours ago · 12 grants found
-              </span>
+              {lastResult ? (
+                <span className="inline-flex items-center gap-1">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-brand" />
+                  Last run: {lastResult.status} · {lastResult.grants_found} grants found
+                  {lastResult.errors?.length > 0 && ` · ${lastResult.errors.length} errors`}
+                </span>
+              ) : (
+                <span>{DEFAULT_URLS.length} sources configured · Ready to search</span>
+              )}
             </p>
           </div>
-          <Button variant="brand" className="gap-2">
-            <Zap className="h-4 w-4" /> Run Search Now
+          <Button variant="brand" className="gap-2" onClick={handleRunSearch} disabled={isRunning}>
+            {isRunning ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Searching...
+              </>
+            ) : (
+              <>
+                <Zap className="h-4 w-4" /> Run Search Now
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
 
-      {/* Upcoming Deadlines */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-brand" /> Upcoming Deadlines
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {deadlines.map((d) => (
-              <div
-                key={d.title}
-                className="flex flex-col items-start justify-between gap-2 rounded-lg border border-border p-4 sm:flex-row sm:items-center"
-              >
-                <div>
-                  <p className="font-medium text-foreground">{d.title}</p>
-                  <p className="text-sm text-muted-foreground">{d.funder}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="secondary" className={statusColors[d.status]}>
-                    {d.status.replace("_", " ")}
-                  </Badge>
-                  <span className="text-sm font-medium text-muted-foreground">{d.date}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Last run errors */}
+      {lastResult?.errors && lastResult.errors.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertCircle className="h-4 w-4 text-destructive" /> Errors from last run
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-sm">
+              {lastResult.errors.slice(0, 10).map((e, i) => (
+                <p key={i} className="text-muted-foreground">{e}</p>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
