@@ -8,8 +8,11 @@ import {
   Settings,
   Compass,
   Activity,
+  LogOut,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -37,6 +40,14 @@ const settingsItems = [
 ];
 
 export function AppSidebar() {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
+
   return (
     <Sidebar collapsible="icon">
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-4">
@@ -77,6 +88,18 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup className="mt-auto">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Sign Out" onClick={handleSignOut}>
+                  <LogOut className="h-4 w-4" />
+                  <span>Sign Out</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
